@@ -44,27 +44,8 @@
         _accessGroup = accessGroup;
         _defaultAccessiblity = A0SimpleKeychainItemAccessibleAfterFirstUnlock;
         _useAccessControl = NO;
-        
-// This does not apply to watchOS & tvOS
-#if A0LocalAuthenticationCapable
-        _localAuthenticationContext = [LAContext new];
-        _localAuthenticationContext.touchIDAuthenticationAllowableReuseDuration = 0;
-#endif
     }
     return self;
-}
-
-- (void)setTouchIDAuthenticationAllowableReuseDuration:(NSTimeInterval) duration {
-// This does not apply to watchOS & tvOS
-#if A0LocalAuthenticationCapable
-    if (duration <= 0) {
-        _localAuthenticationContext.touchIDAuthenticationAllowableReuseDuration = 0;
-    } else if (duration >= LATouchIDAuthenticationMaximumAllowableReuseDuration) {
-        _localAuthenticationContext.touchIDAuthenticationAllowableReuseDuration = LATouchIDAuthenticationMaximumAllowableReuseDuration;
-    } else {
-        _localAuthenticationContext.touchIDAuthenticationAllowableReuseDuration = duration;
-    }
-#endif
 }
 
 - (NSString *)stringForKey:(NSString *)key {
@@ -83,7 +64,17 @@
     }
     return string;
 }
-
+- (void)stringForKey:(NSString *)key promptMessage:(NSString *)message completion:(void (^)(NSString *result, NSError *error))completion{
+    
+    NSError *error = nil;
+    NSData *data = [self dataForKey:key promptMessage:message error:&error];//[self dataForKey:key promptMessage:message];
+    NSString *string = nil;
+    if (data) {
+        string = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    }
+    if (completion) completion(string, error);
+    
+}
 - (NSData *)dataForKey:(NSString *)key promptMessage:(NSString *)message {
     return [self dataForKey:key promptMessage:message error:nil];
 }
@@ -118,25 +109,6 @@
     NSDictionary *query = [self queryFindByKey:key message:nil];
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, NULL);
     return status == errSecSuccess;
-}
-
-- (nonnull NSArray *)keys {
-    NSMutableArray *keys = [NSMutableArray array];
-    NSDictionary *query = [self queryFindAll];
-    CFArrayRef result = nil;
-    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
-    if (status == errSecSuccess) {
-        NSArray *items = [NSArray arrayWithArray:(__bridge NSArray *)result];
-        CFBridgingRelease(result);
-        for (NSDictionary *item in items) {
-            id secAccount = item[(__bridge id)kSecAttrAccount];
-            if ([secAccount isKindOfClass:[NSString class]]) {
-                NSString *key = (NSString *)secAccount;
-                [keys addObject:key];
-            }
-        }
-    }
-    return keys;
 }
 
 - (BOOL)setString:(NSString *)string forKey:(NSString *)key {
@@ -250,21 +222,13 @@
             accessibility = kSecAttrAccessibleAfterFirstUnlock;
             break;
         case A0SimpleKeychainItemAccessibleAlways:
-#if TARGET_OS_MACCATALYST
-            accessibility = kSecAttrAccessibleAfterFirstUnlock;
-#else
             accessibility = kSecAttrAccessibleAlways;
-#endif
             break;
         case A0SimpleKeychainItemAccessibleAfterFirstUnlockThisDeviceOnly:
             accessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
             break;
         case A0SimpleKeychainItemAccessibleAlwaysThisDeviceOnly:
-#if TARGET_OS_MACCATALYST
-            accessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
-#else
             accessibility = kSecAttrAccessibleAlwaysThisDeviceOnly;
-#endif
             break;
 #if TARGET_OS_IPHONE
         case A0SimpleKeychainItemAccessibleWhenPasscodeSetThisDeviceOnly:
@@ -315,7 +279,7 @@
         case errSecDecode:
             return NSLocalizedStringFromTable(@"errSecDecode: Unable to decode the provided data", @"SimpleKeychain", @"Possible error from keychain. ");
         default:
-            return [NSString stringWithFormat:NSLocalizedStringFromTable(@"Unknown error code %d", @"SimpleKeychain", @"Possible error from keychain. "), (int)status];
+            return [NSString stringWithFormat:NSLocalizedStringFromTable(@"Unknown error code %d", @"SimpleKeychain", @"Possible error from keychain. "), status];
     }
 }
 
@@ -325,17 +289,11 @@
     NSMutableDictionary *attributes = [@{
                                          (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
                                          (__bridge id)kSecAttrService: self.service,
-                                         (__bridge id)kSecUseAuthenticationUI: (__bridge id)kSecUseAuthenticationUIAllow,
                                          } mutableCopy];
-
 #if !TARGET_IPHONE_SIMULATOR
     if (self.accessGroup) {
         attributes[(__bridge id)kSecAttrAccessGroup] = self.accessGroup;
     }
-    
-#if A0LocalAuthenticationCapable
-    attributes[(__bridge id)kSecUseAuthenticationContext] = self.localAuthenticationContext;
-#endif
 #endif
 
     return attributes;

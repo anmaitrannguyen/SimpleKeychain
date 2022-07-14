@@ -22,12 +22,6 @@
 
 #import <Foundation/Foundation.h>
 
-#if __has_include("LocalAuthentication/LocalAuthentication.h")
-
-#import <LocalAuthentication/LocalAuthentication.h>
-
-#endif
-
 ///---------------------------------------------------
 /// @name Keychain Items Accessibility Values
 ///---------------------------------------------------
@@ -67,9 +61,6 @@ typedef NS_ENUM(NSInteger, A0SimpleKeychainItemAccessible) {
 };
 
 #define A0ErrorDomain @"com.auth0.simplekeychain"
-
-#define A0LocalAuthenticationCapable (TARGET_OS_IOS && __IPHONE_OS_VERSION_MIN_REQUIRED >= 80000) || (TARGET_OS_OSX && __MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_2)
-
 
 /**
  * Enum with keychain error codes. It's a mirror of the keychain error codes. 
@@ -150,14 +141,6 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @property (assign, nonatomic) BOOL useAccessControl;
 
-
-/**
-*  LocalAuthenticationContext used to access items. Default value is a new LAContext object
-*/
-#if A0LocalAuthenticationCapable
-@property (readonly, nullable, nonatomic) LAContext *localAuthenticationContext;
-#endif
-
 ///---------------------------------------------------
 /// @name Initialization
 ///---------------------------------------------------
@@ -187,14 +170,6 @@ NS_ASSUME_NONNULL_BEGIN
  *  @return an initialised instance.
  */
 - (instancetype)initWithService:(NSString *)service accessGroup:(nullable NSString *)accessGroup;
-
-/**
- *  The duration for which Touch ID authentication reuse is allowable.
- *  Maximun value is LATouchIDAuthenticationMaximumAllowableReuseDuration
- */
-#if A0LocalAuthenticationCapable
-- (void)setTouchIDAuthenticationAllowableReuseDuration:(NSTimeInterval) duration API_AVAILABLE(ios(8), macosx(10.12)) API_UNAVAILABLE(watchos, tvos);
-#endif
 
 ///---------------------------------------------------
 /// @name Store values
@@ -230,7 +205,7 @@ NS_ASSUME_NONNULL_BEGIN
  *  @return if the value was saved it will return YES. Otherwise it'll return NO.
  */
 - (BOOL)setString:(NSString *)string forKey:(NSString *)key promptMessage:(nullable NSString *)message;
-
+    
 /**
  *  Saves the NSData with the type `kSecClassGenericPassword` in the keychain.
  *
@@ -293,6 +268,15 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable NSString *)stringForKey:(NSString *)key promptMessage:(nullable NSString *)message;
 
 /**
+ *  Fetches a NSString from the keychain
+ *
+ *  @param key     the key of the value to fetch
+ *  @param message prompt message to display for TouchID/passcode prompt if neccesary
+ *  @param completion callback function that return the value or an error occurs.
+ */
+- (void)stringForKey:(NSString *)key promptMessage:(NSString *)message completion:(void (^)(NSString *result, NSError *error))completion;
+    
+/**
  *  Fetches a NSData from the keychain
  *
  *  @param key     the key of the value to fetch
@@ -322,14 +306,6 @@ NS_ASSUME_NONNULL_BEGIN
  *  @return if the key has an associated value in the Keychain or not.
  */
 - (BOOL)hasValueForKey:(NSString *)key;
-
-
-/**
- *  Fetches an array of NSString containing all the keys used in the keychain
- *
- *  @return a NSString array with all keys from the keychain.
- */
-- (nonnull NSArray *)keys;
 
 ///---------------------------------------------------
 /// @name Create helper methods
